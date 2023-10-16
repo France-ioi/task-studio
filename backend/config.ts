@@ -7,6 +7,8 @@ type Config = {
     },
     git?: {
         allowedRepositories?: string[],
+        authorName?: string,
+        authorEmail?: string,
         gitlabUser?: string,
         gitlabPassword?: string,
         githubUser?: string,
