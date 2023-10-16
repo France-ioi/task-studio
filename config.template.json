@@ -1,0 +1,14 @@
+{
+    "port": 8050,
+    "folders": {
+        "base": "/path/to/task-studio/files/",
+        "repositories": "repositories/",
+        "sessions": "sessions/"
+    },
+    "git": {
+        "gitlabUser": "",
+        "gitlabPassword": "",
+        "githubUser": "",
+        "githubPassword": ""
+    }
+}
