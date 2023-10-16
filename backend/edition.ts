@@ -24,9 +24,11 @@ function dirCopy(src: string, dest: string): void {
     exec(`cp -R ${src}/* ${dest}`);
 }
 
-function getGitRepository(repo: string): GitRepository {
+async function getGitRepository(repo: string): Promise<GitRepository> {
     const repoDir = repo.trim().replace(/\.git$/, '').replace(/[^A-Za-z0-9]/g, '_');
-    return new GitRepository(repo, path.join(config.folders.base, config.folders.repositories, repoDir));
+    const repoGit = new GitRepository(repo, path.join(config.folders.base, config.folders.repositories, repoDir));
+    await repoGit.init();
+    return repoGit;
 }
 
 function getGitBranchForFolder(repo: string, repoDir: string): string {
@@ -62,7 +64,7 @@ function setGitBackendUser(repo: string, username?: string, password?: string): 
 }
 
 async function getGitMainBranch(repo: string): Promise<string> {
-    const repoGit = getGitRepository(repo);
+    const repoGit = await getGitRepository(repo);
     let branches: BranchSummary;
     try {
         branches = await repoGit.git.branch();
@@ -78,7 +80,7 @@ async function getGitMainBranch(repo: string): Promise<string> {
 }
 
 async function updateGit(repo: string, subdir: string, username: string, password: string): Promise<{ success: boolean; error?: string; output?: string[] }> {
-    const repoGit = getGitRepository(repo);
+    const repoGit = await getGitRepository(repo);
     const repoBranch = getGitBranchForFolder(repo, subdir);
 
     try {
@@ -117,15 +119,15 @@ async function prepareEdition(repo: string, subdir: string): Promise<PrepareEdit
     const sessionId = Math.random().toString(36).substring(7); // TODO :: better
     const sessionDir = getSessionDir(sessionId);
 
-    const repoGit = getGitRepository(repo);
+    const repoGit = await getGitRepository(repo);
     subdir = subdir.trim().replace(/^\//, '').replace(/\/$/, ''); // TODO :: extract as function and reuse later
-    const localSubdir = path.join(repoGit.path, subdir);
+    const localSubdir = path.join(repoGit.directory, subdir);
     mkdirSync(sessionDir, { recursive: true });
     dirCopy(localSubdir, sessionDir);
 
     // Copy variables.json
-    if (existsSync(path.join(repoGit.path, 'variables.json'))) {
-        copyFileSync(path.join(repoGit.path, 'variables.json'), path.join(sessionDir, 'variables.json'));
+    if (existsSync(path.join(repoGit.directory, 'variables.json'))) {
+        copyFileSync(path.join(repoGit.directory, 'variables.json'), path.join(sessionDir, 'variables.json'));
     }
 
     //const historyInfo = await getHistory(repo, subdir);
@@ -153,9 +155,9 @@ async function commitEdition(repo: string, subdir: string, sessionId: string, co
     }
     const sessionDir = getSessionDir(sessionId);
 
-    const repoGit = getGitRepository(repo);
+    const repoGit = await getGitRepository(repo);
     subdir = subdir.trim().replace(/^\//, '').replace(/\/$/, '');
-    const localSubdir = path.join(repoGit.path, subdir) + '/';
+    const localSubdir = path.join(repoGit.directory, subdir) + '/';
 
     await repoGit.git.checkout(getGitBranchForFolder(repo, subdir));
 
@@ -191,7 +193,7 @@ async function getBranchHistory(repo: string, subdir: string, branch: string): P
         },
     };
     logOptions[branch] = null;
-    const logs = await getGitRepository(repo).git.log(logOptions);
+    const logs = await (await getGitRepository(repo)).git.log(logOptions);
     return logs.all.map((log) => ({
         hash: log.hash,
         date: log.date,
@@ -256,7 +258,7 @@ export async function getHistory(repo: string, subdir: string): Promise<GetHisto
 }
 
 export async function checkoutHashEdition(repo: string, hash: string) {
-    const repoDir = getGitRepository(repo);
+    const repoDir = await getGitRepository(repo);
     await repoDir.git.checkout(hash);
     return { success: true };
 }
@@ -264,7 +266,7 @@ export async function checkoutHashEdition(repo: string, hash: string) {
 
 
 export async function getLastCommits(repo: string, subdir: string, username: string, password: string) {
-    const repoGit = getGitRepository(repo);
+    const repoGit = await getGitRepository(repo);
 
     const masterBranch = await getGitMainBranch(repo);
 
@@ -289,7 +291,7 @@ export async function getLastCommits(repo: string, subdir: string, username: str
 }
 
 export async function publishEdition(repo: string, subdir: string, type: string, username: string, password: string, title: string, body: string) {
-    const repoGit = getGitRepository(repo);
+    const repoGit = await getGitRepository(repo);
     const masterBranch = await getGitMainBranch(repo);
 
     await repoGit.git.checkout(masterBranch);
@@ -374,7 +376,7 @@ export async function publishEdition(repo: string, subdir: string, type: string,
 }
 
 export async function diffEdition(repo: string, subdir: string, hash: string, target: string) {
-    const repoGit = getGitRepository(repo);
+    const repoGit = await getGitRepository(repo);
     const masterBranch = await getGitMainBranch(repo);
 
     repoGit.git.checkout(masterBranch);
